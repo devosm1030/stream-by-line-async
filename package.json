@@ -10,7 +10,7 @@
   "author": "Mike DeVos",
   "license": "MIT",
   "scripts": {
-    "standard": "standard",
+    "standard": "standard --fix",
     "test": "node node_modules/jest/bin/jest.js .test.js --config jest.config.js --colors --runInBand",
     "report": "open-cli ./coverage/lcov-report/index.html"
   },
