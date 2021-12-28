@@ -1,0 +1,48 @@
+{
+  "name": "stream-by-line-async",
+  "version": "0.0.1",
+  "description": "Asyncronous stream line processor.",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devosm1030/stream-by-line-async.git"
+  },
+  "author": "Mike DeVos",
+  "license": "MIT",
+  "scripts": {
+    "standard": "standard",
+    "test": "node node_modules/jest/bin/jest.js .test.js --config jest.config.js --colors --runInBand",
+    "report": "open-cli ./coverage/lcov-report/index.html"
+  },
+  "bugs": {
+    "url": "https://github.com/devosm1030/stream-by-line-async/issues"
+  },
+  "homepage": "https://github.com/devosm1030/stream-by-line-async#readme",
+  "devDependencies": {
+    "jest": "^27.4.5",
+    "jest-cli": "^27.4.5",
+    "jest-junit": "^13.0.0",
+    "jest-mock-props": "^1.9.0",
+    "nyc": "^15.1.0",
+    "open-cli": "^7.0.1",
+    "standard": "^16.0.4"
+  },
+  "nyc": {
+    "exclude": [
+      "**/*.test.js",
+      "bin/**/*.js"
+    ]
+  },
+  "standard": {
+    "globals": [
+      "describe",
+      "beforeAll",
+      "beforeEach",
+      "afterEach",
+      "afterAll",
+      "jest",
+      "it",
+      "expect"
+    ]
+  }
+}
