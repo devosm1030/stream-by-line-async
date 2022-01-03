@@ -6,7 +6,8 @@ class StreamByLine {
     this.init(...args)
   }
 
-  init (stream, options = {}) {
+  init (stream = null, options = {}) {
+    if (!stream) throw new Error('Cannot instantiate StreamByLine without a stream.')
     this.stream = stream
     const dflts = {
       preserveEol: false, // -- keep eol with each line during processing
