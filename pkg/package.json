@@ -1,0 +1,16 @@
+{
+  "name": "stream-by-line-async",
+  "version": "0.0.1",
+  "description": "Asyncronous stream line processor.",
+  "main": "StreamByLine.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devosm1030/stream-by-line-async.git"
+  },
+  "author": "Mike DeVos",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/devosm1030/stream-by-line-async/issues"
+  },
+  "homepage": "https://github.com/devosm1030/stream-by-line-async#readme"
+}

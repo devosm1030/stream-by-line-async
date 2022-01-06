@@ -1,7 +1,7 @@
 {
-  "name": "stream-by-line-async",
+  "name": "stream-by-line-async-dev",
   "version": "0.0.1",
-  "description": "Asyncronous stream line processor.",
+  "description": "Asyncronous stream line processor Developer Logic.",
   "main": "./src/StreamByLine.js",
   "repository": {
     "type": "git",

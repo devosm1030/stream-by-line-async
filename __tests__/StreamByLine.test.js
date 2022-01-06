@@ -1,6 +1,6 @@
-const { PassThrough } = require('stream')
+// const { PassThrough } = require('stream')
 const { resolve: pathResolve } = require('path')
-const srcRoot = pathResolve(__dirname, '../src')
+const srcRoot = pathResolve(__dirname, '../pkg')
 
 describe('StreamByLine.js unit tests', () => {
   beforeEach(() => {
