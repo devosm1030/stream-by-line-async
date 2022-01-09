@@ -5,4 +5,4 @@ class StreamByLineError extends Error {
   }
 }
 
-module.exports = ({ StreamByLineError })
+module.exports = StreamByLineError

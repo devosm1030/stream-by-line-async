@@ -1,4 +1,4 @@
-// const { PassThrough } = require('stream')
+const { PassThrough } = require('stream')
 const { resolve: pathResolve } = require('path')
 const srcRoot = pathResolve(__dirname, '../pkg')
 const { inspect } = require('util')
@@ -167,8 +167,71 @@ describe('StreamByLine.js unit tests', () => {
       return { sbl, lines, lineAddPromises }
     }
 
+    it('throws error if any lines errored', async () => {
+      expect.assertions(4)
+      const { StreamByLine } = require(pathResolve(srcRoot, 'StreamByLine.js'))
+      const mockedStream = new PassThrough()
+      const sbl = new StreamByLine(mockedStream)
+      const addLinesSpy = jest.fn(() => Promise.resolve())
+      sbl.lineQueue = {
+        addLines: addLinesSpy,
+        done: () => Promise.resolve([new Error('line1 error'), new Error('line2 error')])
+      }
+      const streamDonePromise = sbl.procStream()
+      let streamErr = null
+      streamDonePromise.catch(e => { streamErr = e })
+      mockedStream.push(Buffer.from('testline1\ntestline2', 'utf8'))
+      mockedStream.end()
+      await expect(streamDonePromise).rejects.toThrowError('One or more lines of stream did not process successfully.')
+      expect(streamErr.lineErrors[0].message).toEqual('line1 error')
+      expect(streamErr.lineErrors[1].message).toEqual('line2 error')
+      expect(addLinesSpy).toHaveBeenCalledTimes(2)
+    })
+
+    it('successfully processes lines in a stream when stream ends in eol', async () => {
+      expect.assertions(2)
+      const { StreamByLine } = require(pathResolve(srcRoot, 'StreamByLine.js'))
+      const mockedStream = new PassThrough()
+      const sbl = new StreamByLine(mockedStream)
+      let lines = []
+      const mockAddLines = linesIn => {
+        lines = lines.concat(linesIn)
+        return Promise.resolve()
+      }
+      sbl.lineQueue = {
+        addLines: mockAddLines,
+        done: () => Promise.resolve([])
+      }
+      const streamDonePromise = sbl.procStream()
+      mockedStream.push(Buffer.from('testline1\ntestline2\n', 'utf8'))
+      mockedStream.end()
+      await expect(streamDonePromise).resolves.toBe(undefined)
+      expect(lines).toEqual(['testline1', 'testline2'])
+    })
+
+    it('successfully processes lines in a stream when stream ends without eol', async () => {
+      expect.assertions(2)
+      const { StreamByLine } = require(pathResolve(srcRoot, 'StreamByLine.js'))
+      const mockedStream = new PassThrough()
+      const sbl = new StreamByLine(mockedStream)
+      let lines = []
+      const mockAddLines = linesIn => {
+        lines = lines.concat(linesIn)
+        return Promise.resolve()
+      }
+      sbl.lineQueue = {
+        addLines: mockAddLines,
+        done: () => Promise.resolve([])
+      }
+      const streamDonePromise = sbl.procStream()
+      mockedStream.push(Buffer.from('testline1\ntestline2', 'utf8'))
+      mockedStream.end()
+      await expect(streamDonePromise).resolves.toBe(undefined)
+      expect(lines).toEqual(['testline1', 'testline2'])
+    })
+
     it('stream reads wait for line callback delays', async () => {
-      expect.assertions(21)
+      expect.assertions(19)
       jest.useFakeTimers()
       let nextChunks = null
       const streamActions = {}
@@ -187,9 +250,8 @@ describe('StreamByLine.js unit tests', () => {
         expect(nextChunks.length).toBe(0)
         readableDone.resolve()
       })
-      await nextLineAddPromise.resolved
+      await nextLineAddPromise.resolved // -- line added - 2s delay starts
       nextLineAddPromise = lineAddPromises[lineAddPromises.length - 1]
-      expect(inspect(procSteamPromise).includes('pending')).toBe(true)
       expect(nextChunks.length).toBe(2)
       expect(streamReadSpy).toHaveBeenCalledTimes(1)
       jest.advanceTimersByTime(1000)
@@ -204,7 +266,6 @@ describe('StreamByLine.js unit tests', () => {
       // -- second chunk read
       await nextLineAddPromise.resolved
       nextLineAddPromise = lineAddPromises[lineAddPromises.length - 1]
-      expect(inspect(procSteamPromise).includes('pending')).toBe(true)
       expect(nextChunks.length).toBe(1)
       expect(streamReadSpy).toHaveBeenCalledTimes(2)
       expect(lines).toEqual(['line1', 'line2'])
@@ -224,7 +285,6 @@ describe('StreamByLine.js unit tests', () => {
         readableDone.resolve()
       })
       await nextLineAddPromise.resolved
-      expect(inspect(procSteamPromise).includes('pending')).toBe(true)
       expect(nextChunks.length).toBe(1)
       expect(streamReadSpy).toHaveBeenCalledTimes(4)
       jest.advanceTimersByTime(2000)
@@ -233,27 +293,10 @@ describe('StreamByLine.js unit tests', () => {
       expect(lines).toEqual(['line1', 'line2', 'line3'])
 
       // -- stream is over - no more readables
+      expect(inspect(procSteamPromise).includes('pending')).toBe(true)
       streamActions.end()
       await procSteamPromise
       expect(lines).toEqual(['line1', 'line2', 'line3', 'line4'])
     })
   })
-
-  /* it('streams', async () => {
-    expect.assertions(5)
-    const { StreamByLine } = require(pathResolve(srcRoot, 'StreamByLine.js'))
-    const mockedStream = new PassThrough()
-    const stream = new StreamByLine(mockedStream)
-    let lines = []
-    const streamDonePromise = stream.eachLine(chunk => { lines = lines.concat(chunk.split('\n')) })
-    mockedStream.push(Buffer.from('test line 1\nb\nc\nddd', 'utf8'))
-    mockedStream.push(Buffer.from('test line 2', 'utf8'))
-    mockedStream.end()
-    await expect(streamDonePromise).resolves.toBe(undefined)
-    expect(lines[0]).toEqual('test line 1')
-    expect(lines[1]).toEqual('b')
-    expect(lines[2]).toEqual('c')
-    expect(lines[3]).toEqual('dddtest line 2')
-  })
-  */
 })

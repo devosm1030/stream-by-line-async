@@ -1,5 +1,5 @@
 const { LineQueue } = require('./LineQueue')
-const { StreamByLineError } = require('./StreamByLineError')
+const StreamByLineError = require('./StreamByLineError')
 
 class StreamByLine {
   constructor (...args) {
@@ -20,6 +20,9 @@ class StreamByLine {
   }
 
   async queueChunk (data, leftOvers) {
+    // -- Queue the lines in the current data for processing. Wait until
+    // -- lineQueue is ready to accept more lines before returning, so that
+    // -- we only read more chunks from the stream when we are ready to handle them.
     let delim = this.lineDelim || '\r\n' // try win eol first
     let lines = (leftOvers + data).split(delim)
     if ((!this.lineDelim) && lines.length === 1) {
@@ -46,7 +49,7 @@ class StreamByLine {
     this.stream.on('end', () => { endOfStreamResolve() })
     await endOfStream
     if (leftOvers) this.lineQueue.addLines([leftOvers])
-    const lineErrs = await this.lineQueue.done()
+    const lineErrs = await this.lineQueue.done() // -- wait for any remaining async line processing to complete
     if (lineErrs.length > 0) throw new StreamByLineError('One or more lines of stream did not process successfully.', lineErrs)
   }
 
