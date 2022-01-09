@@ -1,6 +1,7 @@
 // const { PassThrough } = require('stream')
 const { resolve: pathResolve } = require('path')
 const srcRoot = pathResolve(__dirname, '../pkg')
+const { inspect } = require('util')
 
 describe('StreamByLine.js unit tests', () => {
   beforeEach(() => {
@@ -11,6 +12,7 @@ describe('StreamByLine.js unit tests', () => {
     jest.restoreAllMocks()
     jest.resetAllMocks()
     jest.clearAllMocks()
+    jest.useRealTimers()
   })
 
   afterAll(() => {
@@ -127,6 +129,113 @@ describe('StreamByLine.js unit tests', () => {
       leftover = await sbl.queueChunk(';l5', leftover)
       expect(addLinesParams[3]).toEqual(['l4\n;'])
       expect(leftover).toEqual('l5')
+    })
+  })
+
+  describe('eachLine', () => {
+    it('creates lineQueue and processes stream', async () => {
+      expect.assertions(3)
+      const { StreamByLine } = require(pathResolve(srcRoot, 'StreamByLine.js'))
+      const sbl = new StreamByLine('mockstream')
+      const mockCb = 'mockCb'
+      const procStreamSpy = jest.spyOn(sbl, 'procStream').mockImplementation(() => Promise.resolve())
+      await expect(sbl.eachLine(mockCb)).resolves.toBe(undefined)
+      expect(procStreamSpy).toHaveBeenCalled()
+      expect(sbl.lineQueue.lineCb).toEqual('mockCb')
+    })
+  })
+
+  describe('procStream', () => {
+    function Resolved () {
+      this.resolved = new Promise(resolve => { this.resolve = resolve })
+    }
+
+    const sblWithMockedLineQueue = (stream, options = {}) => {
+      const { StreamByLine } = require(pathResolve(srcRoot, 'StreamByLine.js'))
+      const sbl = new StreamByLine(stream, options)
+      const lines = []
+      const lineAddPromises = [new Resolved()]
+      sbl.lineQueue = {
+        addLines: async linesin => {
+          lineAddPromises[lineAddPromises.length - 1].resolve() // latest line is added
+          lineAddPromises.push(new Resolved()) // prep a promise for the next add
+          linesin.forEach(line => lines.push(line))
+          await new Promise(resolve => setTimeout(resolve, 2000)) // 2s pause
+        },
+        done: () => Promise.resolve([])
+      }
+      return { sbl, lines, lineAddPromises }
+    }
+
+    it('stream reads wait for line callback delays', async () => {
+      expect.assertions(21)
+      jest.useFakeTimers()
+      let nextChunks = null
+      const streamActions = {}
+      const streamReadSpy = jest.fn(() => nextChunks.shift())
+      const mockStream = {
+        on: (action, cb) => { streamActions[action] = cb },
+        read: streamReadSpy
+      }
+      const { sbl, lines, lineAddPromises } = sblWithMockedLineQueue(mockStream)
+      const procSteamPromise = sbl.procStream()
+      nextChunks = ['line1\nline2', '\nline3', null]
+      let nextLineAddPromise = lineAddPromises[lineAddPromises.length - 1]
+      let readablePromise = streamActions.readable()
+      let readableDone = new Resolved()
+      readablePromise.then(() => {
+        expect(nextChunks.length).toBe(0)
+        readableDone.resolve()
+      })
+      await nextLineAddPromise.resolved
+      nextLineAddPromise = lineAddPromises[lineAddPromises.length - 1]
+      expect(inspect(procSteamPromise).includes('pending')).toBe(true)
+      expect(nextChunks.length).toBe(2)
+      expect(streamReadSpy).toHaveBeenCalledTimes(1)
+      jest.advanceTimersByTime(1000)
+
+      // -- haven't read next chunk when first lines still pending
+      expect(inspect(readableDone.resolved).includes('pending')).toBe(true)
+      expect(nextChunks.length).toBe(2)
+      expect(streamReadSpy).toHaveBeenCalledTimes(1)
+      expect(lines).toEqual(['line1'])
+      jest.advanceTimersByTime(1000)
+
+      // -- second chunk read
+      await nextLineAddPromise.resolved
+      nextLineAddPromise = lineAddPromises[lineAddPromises.length - 1]
+      expect(inspect(procSteamPromise).includes('pending')).toBe(true)
+      expect(nextChunks.length).toBe(1)
+      expect(streamReadSpy).toHaveBeenCalledTimes(2)
+      expect(lines).toEqual(['line1', 'line2'])
+      jest.advanceTimersByTime(2000)
+
+      // -- no more chunks on first readable
+      await readableDone.resolved
+      expect(streamReadSpy).toHaveBeenCalledTimes(3)
+      expect(lines).toEqual(['line1', 'line2'])
+
+      // -- stream ready to go again - another readable event
+      nextChunks = ['\nline4', null]
+      readablePromise = streamActions.readable()
+      readableDone = new Resolved()
+      readablePromise.then(() => {
+        expect(nextChunks.length).toBe(0)
+        readableDone.resolve()
+      })
+      await nextLineAddPromise.resolved
+      expect(inspect(procSteamPromise).includes('pending')).toBe(true)
+      expect(nextChunks.length).toBe(1)
+      expect(streamReadSpy).toHaveBeenCalledTimes(4)
+      jest.advanceTimersByTime(2000)
+      await readableDone.resolved
+      expect(streamReadSpy).toHaveBeenCalledTimes(5)
+      expect(lines).toEqual(['line1', 'line2', 'line3'])
+
+      // -- stream is over - no more readables
+      streamActions.end()
+      await procSteamPromise
+      expect(lines).toEqual(['line1', 'line2', 'line3', 'line4'])
     })
   })
 
